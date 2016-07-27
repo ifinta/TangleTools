@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Programmed by ifinta -->
+  <title>tangleTools</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+
+  <style>
+  th, td {
+      padding: 5px;
+  }
+
+  tr.a:nth-child(even) {
+    background-color: #ddd;
+  }
+
+  tr.b:nth-child(even) {
+    background-color: #fff;
+  }
+
+  #showtransaction .modal-dialog
+  {
+    width: 1000px;
+  }
+  </style>
+
+<body>
+
+</head>
+
+<script>
+
+var tips;
+var bundles = [];
+var transactions = [];
+var index = 0;
+var maxIndex = 1000;
+
+var toShow = 0;
+var numRows = 50;
+var showind = toShow;
+
+function sendRequest(requestData, callback) {
+  var url = "http://127.0.0.1:14265";
+  console.log( "Sending an request to " + url + " with data " + "|" + JSON.stringify(requestData) + "|" );
+  var request = new XMLHttpRequest();
+  request.open("POST", url);
+  request.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      var json = JSON.parse(this.responseText);
+      if (json.exception) {
+        console.log(json.exception);
+      } else if (json.error) {
+        console.log(json.error);
+      } else {
+        callback(json);
+      }
+    }
+  };
+  request.send("|" + JSON.stringify(requestData) + "|");
+}
+
+$(document).ready(function(){
+    $('.progress-bar').attr('aria-valuemin', 0);
+    $('.progress-bar').attr('aria-valuemax', 1000);
+    $('.progress-bar').attr('aria-valuenow', 1);
+    $('.progress-bar').css('width', '0.1%');
+    $('#pointer').html(toShow + "/?");
+
+    var getTips = {
+        'command': 'getTips'
+    }
+
+    $('#maintable').html("Please wait... getTips running.");
+    sendRequest(getTips, function(data) {
+       console.log("Got tx: " + JSON.stringify(data));
+       $('#maintable').html("");
+       tips = data.hashes;
+       maxIndex = tips.length;
+       $('.progress-bar').attr('aria-valuemax', maxIndex);
+    });
+
+    $("#play").click( function(e){
+      e.preventDefault();
+
+      $('#maintable').html("");
+
+      $.each(transactions, function(m, item) {
+        $.each(item, function(n, tx) {
+          //if(tx.address == "SZFYCCCVXBFGZBO9EYZCDMVGNKHNCEMLKLTMLPWPLDGXZSJIRIMOXXCTHOPSVGLYZGTIGGNPBWSXOBQGP")
+          if(tx.address == "IBCTEUYCNWICK9SVPMHHZHYTIHGIWWQEFJVQSLODG9DRUQZDIAIAJZPPFHOJVVIVBEFDJGHGKKVBNJPVJWOJFYNUIG")
+          {
+            $('#maintable').append(
+              $('<tr class="a">').html('<td>' + showtx(tx.hash,0) + '</td>')
+            );
+          }
+        });
+      });
+
+      $('#maintable').append(
+        $('<tr class="a">').html('<td>done</td>')
+      );
+
+      return false;
+    });
+
+    $(".prev").click( function(e){
+      e.preventDefault();
+
+      $('#maintable').html("");
+      toShow -= numRows;
+      if(toShow<0)
+        toShow = 0;
+      showind = toShow;
+
+      return false;
+    });
+
+    $(".next").click( function(e){
+      e.preventDefault();
+
+      $('#maintable').html("");
+      toShow += numRows;
+      if(toShow > tips.length)
+        toShow = tips.length - numRows;
+      showind = toShow;
+
+      return false;
+    });
+
+    $(document).on("click", ".tx", function () {
+
+      var getTrytes = {
+        'command': 'getTrytes',
+        'hashes': []
+      }
+
+      getTrytes.hashes.push(this.id);
+
+      sendRequest(getTrytes, function(trytes) {
+         console.log("Got tx trytes: " + JSON.stringify(trytes));
+
+         var analyzeTransactions = {
+           'command': 'analyzeTransactions',
+           'trytes': trytes.trytes
+         }
+
+         sendRequest(analyzeTransactions, function(analyze) {
+           console.log("Analyze tx trytes: " + JSON.stringify(analyze));
+           $("#showtxcontent").text(JSON.stringify(analyze.transactions[0]));
+         });
+      });
+    });
+
+    function showtx(hash, n) {
+      var result = '<a href="#showtransaction" data-toggle="modal" class="tx" id="' + hash + '">';
+      if(n == 0)
+        result = result + hash;
+      else
+        result = result + hash.substring(0, n) + "...";
+      return result + '</a>';
+    };
+
+    setInterval(function(){
+      if(tips && index < maxIndex) {
+        var ind = index++;
+
+        var getBundle = {
+          'command': 'getBundle',
+          'tail': tips[ind]
+        }
+
+        sendRequest(getBundle, function(data) {
+          console.log("Got bundle: " + JSON.stringify(data));
+
+           bundles.push(data);
+
+           var getTrytes = {
+             'command': 'getTrytes',
+             'hashes': []
+           }
+
+           $.each(data.transactions, function(i, item) {
+              getTrytes.hashes.push(item.hash);
+           });
+
+           console.log(getTrytes);
+
+           sendRequest(getTrytes, function(trytes) {
+              console.log("Got trytes: " + JSON.stringify(trytes));
+
+              var analyzeTransactions = {
+                'command': 'analyzeTransactions',
+                'trytes': trytes.trytes
+              }
+
+              sendRequest(analyzeTransactions, function(analyze) {
+                console.log("Analyze trytes: " + JSON.stringify(analyze));
+
+                transactions[ind] = analyze.transactions;
+
+                $('.progress-bar').attr('aria-valuenow', ind);
+                var siz = (ind-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
+                $('.progress-bar').css('width', siz+'%');
+              });
+           });
+        });
+      }
+      else if (tips && index == maxIndex) {
+        $('.progress-bar').attr('aria-valuenow', maxIndex);
+        $('.progress-bar').css('width', '100%');
+        console.log("set 100%");
+        index++;
+      }
+      else if (tips && index == maxIndex + 1) {
+        $('.progress-bar').closest('.progress').fadeOut();
+        console.log("fade out progress bar...");
+        index++;
+      }
+
+      if(tips && index - 1 > showind && showind >= toShow && showind < toShow + numRows) {
+        var tmp;
+        var j = showind++;
+
+        tmp = '</td></table>';
+
+        $.each(transactions[j], function(i, tx) {
+          tmp = '<tr class="b"><td>' + showtx(tx.hash,30) + '</td><td>' + showtx(tx.approvedTrunkTransaction,30) + '</td><td>' + showtx(tx.approvedBranchTransaction,30) + '</td></tr>' + tmp;
+        });
+
+        tmp = '<td>' + showtx(tips[j],0) + '</td><td><table>' + tmp;
+
+        $('#maintable').append(
+          $('<tr class="a">').html(tmp)
+        );
+
+        $('#pointer').html(toShow + "/" + tips.length);
+      }
+    }, 250);
+});
+
+</script>
+
+<!-- Menu -->
+<nav class="navbar navbar-default navbar-inverse navbar-static-top">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="#">tangleTools</a>
+    </div>
+    <ul class="nav navbar-nav">
+      <li><a href="#" id="play"><span class="glyphicon glyphicon-play"></span></a></li>
+    </ul>
+    <ul class="nav navbar-nav navbar-right">
+      <li class="dropdown">
+      	<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><span class="glyphicon glyphicon-cog"></span></a>
+      	<ul class="dropdown-menu">
+      	  <li><a href="#settings" data-toggle="modal">Settings...</a></li>
+      	</ul>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container-fluid" style="background-color:white;">
+  <div class="progress">
+    <div class="progress-bar" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="1" role="progressbar" style="width:0.1%">
+    </div>
+  </div>
+</div>
+
+<div class="container-fluid" style="background-color:white;">
+  <ul class="pager">
+   <li><a href="#" class="prev">Previous</a></li>
+   <li><span id="pointer"></span></li>
+   <li><a href="#" class="next">Next</a></li>
+  </ul>
+</div>
+
+<!-- Content -->
+<div class="container-fluid" style="background-color:white;">
+  <div class="row">
+    <div class="col-sm-12" style="background-color:#bbbbbb;">
+      <table id="maintable"></table>
+    </div>
+  </div>
+
+     <!-- Footer -->
+  <div class="row">
+    <div class="col-sm-5" style="background-color:white;">
+    </div>
+    <div class="col-sm-2" style="background-color:white;">
+       <p>Programmed by ifinta. See my <a href="http://github.com/ifinta">github</a> repositories also.</p>
+    </div>
+    <div class="col-sm-5" style="background-color:white;">
+    </div>
+  </div>
+</div>
+
+<!-- Modal: show transactions... -->
+<div class="modal fade" role="dialog" id="showtransaction">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+      	<button type="button" class="close" data-dismiss="modal">&times;</button>
+      	<h4 class="modal-title">Details:</h4>
+      </div>
+      <div class="modal-body">
+        <form role="form">
+      	  <div class="form-group">
+      	    <label for="comment">Tx JSON:</label>
+      	    <textarea id="showtxcontent" class="form-control" rows="30"></textarea>
+      	  </div>
+      	</form>
+      </div>
+      <div class="modal-footer">
+	       <button type="button" class="btn btn-default" data-dismiss="modal" id="savebutton">Ok</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal settings...-->
+<div class="modal fade" role="dialog" id="settings">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+      	<button type="button" class="close" data-dismiss="modal">&times;</button>
+      	<h4 class="modal-title">Settings</h4>
+      </div>
+      <div class="modal-body">
+      	<form role="form">
+      	</form>
+      </div>
+      <div class="modal-footer">
+	       <button type="button" class="btn btn-default" data-dismiss="modal" id="setbutton">Set</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
