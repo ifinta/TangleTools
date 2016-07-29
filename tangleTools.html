@@ -47,7 +47,7 @@ var showind = toShow;
 
 function sendRequest(requestData, callback) {
   var url = "http://127.0.0.1:14265";
-  console.log( "Sending an request to " + url + " with data " + "|" + JSON.stringify(requestData) + "|" );
+  console.log( "Sending an request to " + url + " with data " + JSON.stringify(requestData) );
   var request = new XMLHttpRequest();
   request.open("POST", url);
   request.onreadystatechange = function() {
@@ -62,7 +62,7 @@ function sendRequest(requestData, callback) {
       }
     }
   };
-  request.send("|" + JSON.stringify(requestData) + "|");
+  request.send(JSON.stringify(requestData));
 }
 
 $(document).ready(function(){
@@ -171,49 +171,67 @@ $(document).ready(function(){
 
         var tail = work.shift();
 
-        var getBundle = {
-          'command': 'getBundle',
-          'tail': tail
-        }
+        var knownTx = transactions.has(tail);
+        if(!knownTx) {
+          var getBundle = {
+            'command': 'getBundle',
+            'transaction': tail
+          }
 
-        sendRequest(getBundle, function(data) {
-          console.log("Got bundle: " + JSON.stringify(data));
+          sendRequest(getBundle, function(data) {
+            console.log("Got bundle: " + JSON.stringify(data));
 
-           var getTrytes = {
-             'command': 'getTrytes',
-             'hashes': []
-           }
+             var getTrytes = {
+               'command': 'getTrytes',
+               'hashes': []
+             }
 
-           $.each(data.transactions, function(i, item) {
-              getTrytes.hashes.push(item.hash);
-           });
+             $.each(data.transactions, function(i, item) {
+               var knownTx = transactions.has(item.hash);
+               if(!knownTx)
+                getTrytes.hashes.push(item.hash);
+               else
+                console.log("known tx... not for analyze.");
+             });
 
-           bundles.set(getBundle.tail, { 'hashes': getTrytes.hashes });
+             if(getTrytes.hashes.length > 0) {
+               bundles.set(getBundle.tail, { 'hashes': getTrytes.hashes });
+             } else {
+               getTrytes.hashes.push(tail);
+             }
 
-           console.log(getTrytes);
+             sendRequest(getTrytes, function(trytes) {
+                console.log("Got trytes: " + JSON.stringify(trytes));
 
-           sendRequest(getTrytes, function(trytes) {
-              console.log("Got trytes: " + JSON.stringify(trytes));
+                var analyzeTransactions = {
+                  'command': 'analyzeTransactions',
+                  'trytes': trytes.trytes
+                }
 
-              var analyzeTransactions = {
-                'command': 'analyzeTransactions',
-                'trytes': trytes.trytes
-              }
+                sendRequest(analyzeTransactions, function(analyze) {
+                  console.log("Analyze trytes: " + JSON.stringify(analyze));
 
-              sendRequest(analyzeTransactions, function(analyze) {
-                console.log("Analyze trytes: " + JSON.stringify(analyze));
+                  $.each(analyze.transactions, function(i, item) {
+                    transactions.set(item.hash, item);
+                    work.push(item.approvedTrunkTransaction);
+                    work.push(item.approvedBranchTransaction);
+                    worksTotal+=2;
+                  });
 
-                $.each(analyze.transactions, function(i, item) {
-                  console.log("item.hash : " + item.hash);
-                  transactions.set(item.hash, item);
+                  console.log("unknownn bundle registered....");
+                  $('.progress-bar').attr('aria-valuemax', worksTotal);
+                  $('.progress-bar').attr('aria-valuenow', ++worksDid);
+                  var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
+                  $('.progress-bar').css('width', siz+'%');
                 });
-
-                $('.progress-bar').attr('aria-valuenow', ++worksDid);
-                var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
-                $('.progress-bar').css('width', siz+'%');
-              });
-           });
-        });
+             });
+          });
+        } else {
+          console.log("known tail... dropped.");
+          $('.progress-bar').attr('aria-valuenow', ++worksDid);
+          var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
+          $('.progress-bar').css('width', siz+'%');
+        }
       }
       else if (worksDid == worksTotal) {
         $('.progress-bar').attr('aria-valuenow', worksDid);
