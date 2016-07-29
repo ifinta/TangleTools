@@ -34,12 +34,12 @@
 
 <script>
 
-var tips;
+var work = [];
 var bundles = new Map();
 var transactions = new Map();
 
-var index = 0;
-var maxIndex = 1000;
+var worksDid = 0;
+var worksTotal = 1000;
 
 var toShow = 0;
 var numRows = 50;
@@ -67,7 +67,7 @@ function sendRequest(requestData, callback) {
 
 $(document).ready(function(){
     $('.progress-bar').attr('aria-valuemin', 0);
-    $('.progress-bar').attr('aria-valuemax', 1000);
+    $('.progress-bar').attr('aria-valuemax', worksTotal);
     $('.progress-bar').attr('aria-valuenow', 1);
     $('.progress-bar').css('width', '0.1%');
     $('#pointer').html(toShow + "/?");
@@ -80,9 +80,9 @@ $(document).ready(function(){
     sendRequest(getTips, function(data) {
        console.log("Got tx: " + JSON.stringify(data));
        $('#maintable').html("");
-       tips = data.hashes;
-       maxIndex = tips.length;
-       $('.progress-bar').attr('aria-valuemax', maxIndex);
+       work = work.concat(data.hashes);
+       worksTotal = data.hashes.length;
+       $('.progress-bar').attr('aria-valuemax', worksTotal);
     });
 
     $("#play").click( function(e){
@@ -126,8 +126,8 @@ $(document).ready(function(){
 
       $('#maintable').html("");
       toShow += numRows;
-      if(toShow > tips.length)
-        toShow = tips.length - numRows;
+      if(toShow > bundles.length)
+        toShow = bundles.length - numRows;
       showind = toShow;
 
       return false;
@@ -167,12 +167,13 @@ $(document).ready(function(){
     };
 
     setInterval(function(){
-      if(tips && index < maxIndex) {
-        var ind = index++;
+      if(work.length > 0) {
+
+        var tail = work.shift();
 
         var getBundle = {
           'command': 'getBundle',
-          'tail': tips[ind]
+          'tail': tail
         }
 
         sendRequest(getBundle, function(data) {
@@ -207,43 +208,17 @@ $(document).ready(function(){
                   transactions.set(item.hash, item);
                 });
 
-                $('.progress-bar').attr('aria-valuenow', ind);
-                var siz = (ind-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
+                $('.progress-bar').attr('aria-valuenow', ++worksDid);
+                var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
                 $('.progress-bar').css('width', siz+'%');
               });
            });
         });
       }
-      else if (tips && index == maxIndex) {
-        $('.progress-bar').attr('aria-valuenow', maxIndex);
+      else if (worksDid == worksTotal) {
+        $('.progress-bar').attr('aria-valuenow', worksDid);
         $('.progress-bar').css('width', '100%');
         console.log("set 100%");
-        index++;
-      }
-      else if (tips && index == maxIndex + 1) {
-        $('.progress-bar').closest('.progress').fadeOut();
-        console.log("fade out progress bar...");
-        index++;
-      }
-
-      if(tips && index - 10 > showind && showind >= toShow && showind < toShow + numRows) {
-        var tmp;
-        var j = showind++;
-
-        tmp = '</td></table>';
-
-        $.each(bundles.get(tips[j]).hashes, function(i, txhash) {
-          console.log("txhash : " + txhash);
-          tmp = '<tr class="b"><td>' + showtx(txhash,30) + '</td><td>' + showtx(transactions.get(txhash).approvedTrunkTransaction,30) + '</td><td>' + showtx(transactions.get(txhash).approvedBranchTransaction,30) + '</td></tr>' + tmp;
-        });
-
-        tmp = '<td>' + showtx(tips[j],0) + '</td><td><table>' + tmp;
-
-        $('#maintable').append(
-          $('<tr class="a">').html(tmp)
-        );
-
-        $('#pointer').html(toShow + "/" + tips.length);
       }
     }, 250);
 });
