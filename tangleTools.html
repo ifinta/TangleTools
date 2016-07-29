@@ -35,8 +35,9 @@
 <script>
 
 var tips;
-var bundles = [];
-var transactions = [];
+var bundles = new Map();
+var transactions = new Map();
+
 var index = 0;
 var maxIndex = 1000;
 
@@ -177,8 +178,6 @@ $(document).ready(function(){
         sendRequest(getBundle, function(data) {
           console.log("Got bundle: " + JSON.stringify(data));
 
-           bundles.push(data);
-
            var getTrytes = {
              'command': 'getTrytes',
              'hashes': []
@@ -187,6 +186,8 @@ $(document).ready(function(){
            $.each(data.transactions, function(i, item) {
               getTrytes.hashes.push(item.hash);
            });
+
+           bundles.set(getBundle.tail, { 'hashes': getTrytes.hashes });
 
            console.log(getTrytes);
 
@@ -201,7 +202,10 @@ $(document).ready(function(){
               sendRequest(analyzeTransactions, function(analyze) {
                 console.log("Analyze trytes: " + JSON.stringify(analyze));
 
-                transactions[ind] = analyze.transactions;
+                $.each(analyze.transactions, function(i, item) {
+                  console.log("item.hash : " + item.hash);
+                  transactions.set(item.hash, item);
+                });
 
                 $('.progress-bar').attr('aria-valuenow', ind);
                 var siz = (ind-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
@@ -222,14 +226,15 @@ $(document).ready(function(){
         index++;
       }
 
-      if(tips && index - 1 > showind && showind >= toShow && showind < toShow + numRows) {
+      if(tips && index - 10 > showind && showind >= toShow && showind < toShow + numRows) {
         var tmp;
         var j = showind++;
 
         tmp = '</td></table>';
 
-        $.each(transactions[j], function(i, tx) {
-          tmp = '<tr class="b"><td>' + showtx(tx.hash,30) + '</td><td>' + showtx(tx.approvedTrunkTransaction,30) + '</td><td>' + showtx(tx.approvedBranchTransaction,30) + '</td></tr>' + tmp;
+        $.each(bundles.get(tips[j]).hashes, function(i, txhash) {
+          console.log("txhash : " + txhash);
+          tmp = '<tr class="b"><td>' + showtx(txhash,30) + '</td><td>' + showtx(transactions.get(txhash).approvedTrunkTransaction,30) + '</td><td>' + showtx(transactions.get(txhash).approvedBranchTransaction,30) + '</td></tr>' + tmp;
         });
 
         tmp = '<td>' + showtx(tips[j],0) + '</td><td><table>' + tmp;
