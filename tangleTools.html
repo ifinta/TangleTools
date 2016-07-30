@@ -38,8 +38,11 @@ var work = [];
 var bundles = new Map();
 var transactions = new Map();
 
+var oldtips = [];
+var tips = [];
+
 var worksDid = 0;
-var worksTotal = 1000;
+var worksTotal = 0;
 
 var toShow = 0;
 var numRows = 50;
@@ -68,7 +71,7 @@ function sendRequest(requestData, callback) {
 $(document).ready(function(){
     $('.progress-bar').attr('aria-valuemin', 0);
     $('.progress-bar').attr('aria-valuemax', worksTotal);
-    $('.progress-bar').attr('aria-valuenow', 1);
+    $('.progress-bar').attr('aria-valuenow', 0);
     $('.progress-bar').css('width', '0.1%');
     $('#pointer').html(toShow + "/?");
 
@@ -76,13 +79,11 @@ $(document).ready(function(){
         'command': 'getTips'
     }
 
-    $('#maintable').html("Please wait... getTips running.");
     sendRequest(getTips, function(data) {
        console.log("Got tx: " + JSON.stringify(data));
-       $('#maintable').html("");
-       work = work.concat(data.hashes);
-       worksTotal = data.hashes.length;
-       $('.progress-bar').attr('aria-valuemax', worksTotal);
+       tips = data.hashes;
+       var d = new Date();
+       $('#status').append("Time: " + d + " worksTotal: " + worksTotal + " worksDid: " + worksDid + " xTips: - newTips: - nTips: " + data.hashes.length + "<br/>");
     });
 
     $("#play").click( function(e){
@@ -191,7 +192,7 @@ $(document).ready(function(){
                if(!knownTx)
                 getTrytes.hashes.push(item.hash);
                else
-                console.log("known tx... not for analyze.");
+                console.log("known tx... not for analyze: " + item.hash);
              });
 
              if(getTrytes.hashes.length > 0) {
@@ -227,7 +228,7 @@ $(document).ready(function(){
              });
           });
         } else {
-          console.log("known tail... dropped.");
+          console.log("known tail... dropped: " + tail);
           $('.progress-bar').attr('aria-valuenow', ++worksDid);
           var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
           $('.progress-bar').css('width', siz+'%');
@@ -238,7 +239,61 @@ $(document).ready(function(){
         $('.progress-bar').css('width', '100%');
         console.log("set 100%");
       }
-    }, 250);
+    }, 1000);
+
+    var newTips = [];
+    var xTips = [];
+
+    var iOldTips = 1;
+    var iTips = 1;
+
+    var run = false;
+
+    setInterval( function() {
+      var i;
+      for( i = 0; i < 1000; i++) {
+        if(run && iOldTips < oldtips.length) {
+         if (tips.indexOf(oldtips[iOldTips]) === -1) {
+           xTips.push(oldtips[iOldTips]);
+         }
+         iOldTips++;
+        }
+
+        if(run && iTips < tips.length) {
+         if (oldtips.indexOf(tips[iTips]) === -1) {
+           newTips.push(tips[iTips]);
+         }
+         iTips++;
+        }
+      }
+    }, 2000);
+
+    setInterval( function() {
+      if(iTips == tips.length && iOldTips == oldtips.length) {
+        var d = new Date();
+        $('#status').append("Time: " + d + " worksTotal: " + worksTotal + " worksDid: " + worksDid + " xTips: " + xTips.length + " newTips: " + newTips.length + " nTips: " + tips.length + "<br/>");
+
+        var tmp = [];
+        tmp = xTips.concat(newTips);
+        work = work.concat(tmp);
+        worksTotal += tmp.length;
+        $('.progress-bar').attr('aria-valuemax', worksTotal);
+
+        xTips = [];
+        newTips = [];
+      }
+
+      sendRequest(getTips, function(data) {
+         console.log("Got tx: " + JSON.stringify(data));
+
+         run = false;
+         oldtips = tips;
+         tips = data.hashes;
+         iOldTips = 0;
+         iTips = 0;
+         run = true;
+      });
+    }, 150000);
 });
 
 </script>
@@ -276,6 +331,16 @@ $(document).ready(function(){
    <li><span id="pointer"></span></li>
    <li><a href="#" class="next">Next</a></li>
   </ul>
+</div>
+
+<div class="container-fluid" style="background-color:white;">
+  <div class="col-sm-3" style="background-color:white;">
+  </div>
+  <div class="col-sm-6" style="background-color:white;">
+    <p id="status"></p>
+  </div>
+  <div class="col-sm-6" style="background-color:white;">
+  </div>
 </div>
 
 <!-- Content -->
