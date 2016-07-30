@@ -26,6 +26,11 @@
   {
     width: 1000px;
   }
+
+  table, td
+  {
+    border: 1px solid black;
+  }
   </style>
 
 <body>
@@ -93,7 +98,6 @@ $(document).ready(function(){
 
       $.each(transactions, function(m, item) {
         $.each(item, function(n, tx) {
-          //if(tx.address == "SZFYCCCVXBFGZBO9EYZCDMVGNKHNCEMLKLTMLPWPLDGXZSJIRIMOXXCTHOPSVGLYZGTIGGNPBWSXOBQGP")
           if(tx.address == "IBCTEUYCNWICK9SVPMHHZHYTIHGIWWQEFJVQSLODG9DRUQZDIAIAJZPPFHOJVVIVBEFDJGHGKKVBNJPVJWOJFYNUIG")
           {
             $('#maintable').append(
@@ -134,6 +138,49 @@ $(document).ready(function(){
       return false;
     });
 
+    $(document).on("click", ".leg", function(e){
+      var tail = this.id;
+      var obj = $(this);
+      console.log("id: " + tail);
+
+      var getBundle = {
+        'command': 'getBundle',
+        'transaction': tail
+      }
+
+      sendRequest(getBundle, function(data) {
+        console.log("Got bundle: " + JSON.stringify(data));
+
+        var getTrytes = {
+          'command': 'getTrytes',
+          'hashes': []
+        }
+
+        $.each(data.transactions, function(i, item) {
+           getTrytes.hashes.push(item.hash);
+        });
+
+        sendRequest(getTrytes, function(trytes) {
+           console.log("Got trytes: " + JSON.stringify(trytes));
+
+           var analyzeTransactions = {
+             'command': 'analyzeTransactions',
+             'trytes': trytes.trytes
+           }
+
+           sendRequest(analyzeTransactions, function(analyze) {
+             console.log("Analyze trytes: " + JSON.stringify(analyze));
+
+             var item = analyze.transactions[analyze.transactions.length - 1];
+
+             var newhtml = '<table><tr><td colspan="2">' + showtx(tail, 10) + '</td></tr><tr><td>' + showleg(item.approvedTrunkTransaction, 10) + '</td><td>' + showleg(item.approvedBranchTransaction, 10) + '</td></tr></table>';
+             console.log("newhtml: " + newhtml);
+             obj.parent().html(newhtml);
+           });
+         });
+       });
+    });
+
     $(document).on("click", ".tx", function () {
 
       var getTrytes = {
@@ -157,6 +204,15 @@ $(document).ready(function(){
          });
       });
     });
+
+    function showleg(hash, n) {
+      var result = '<a href="#" class="leg" id="' + hash + '">';
+      if(n == 0)
+        result = result + hash;
+      else
+        result = result + hash.substring(0, n) + "...";
+      return result + '</a>';
+    };
 
     function showtx(hash, n) {
       var result = '<a href="#showtransaction" data-toggle="modal" class="tx" id="' + hash + '">';
@@ -347,7 +403,9 @@ $(document).ready(function(){
 <div class="container-fluid" style="background-color:white;">
   <div class="row">
     <div class="col-sm-12" style="background-color:#bbbbbb;">
-      <table id="maintable"></table>
+      <table id="maintable" class="tangle">
+        <tr><td><a href="#" class="leg" id="BIIVICUISRJOFEDIUDRNXFZIYERDWYGUWZKMRISNVPWQPW9UIJKAABENKERVAAH9EHJZDMNTSFRFW9999">BIIVICUISR...</a></td></tr>
+      </table>
     </div>
   </div>
 
