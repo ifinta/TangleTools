@@ -39,20 +39,6 @@
 
 <script>
 
-var work = [];
-var bundles = new Map();
-var transactions = new Map();
-
-var oldtips = [];
-var tips = [];
-
-var worksDid = 0;
-var worksTotal = 0;
-
-var toShow = 0;
-var numRows = 50;
-var showind = toShow;
-
 function sendRequest(requestData, callback) {
   var url = "http://127.0.0.1:14265";
   console.log( "Sending an request to " + url + " with data " + JSON.stringify(requestData) );
@@ -74,68 +60,18 @@ function sendRequest(requestData, callback) {
 }
 
 $(document).ready(function(){
-    $('.progress-bar').attr('aria-valuemin', 0);
-    $('.progress-bar').attr('aria-valuemax', worksTotal);
-    $('.progress-bar').attr('aria-valuenow', 0);
-    $('.progress-bar').css('width', '0.1%');
-    $('#pointer').html(toShow + "/?");
-
     var getTips = {
         'command': 'getTips'
     }
+
+    var d = new Date();
+    $('#status').html("Time: " + d + " Getting tips... Please wait!");
 
     sendRequest(getTips, function(data) {
        console.log("Got tx: " + JSON.stringify(data));
        tips = data.hashes;
        var d = new Date();
-       $('#status').append("Time: " + d + " worksTotal: " + worksTotal + " worksDid: " + worksDid + " xTips: - newTips: - nTips: " + data.hashes.length + "<br/>");
-    });
-
-    $("#play").click( function(e){
-      e.preventDefault();
-
-      $('#maintable').html("");
-
-      $.each(transactions, function(m, item) {
-        $.each(item, function(n, tx) {
-          if(tx.address == "IBCTEUYCNWICK9SVPMHHZHYTIHGIWWQEFJVQSLODG9DRUQZDIAIAJZPPFHOJVVIVBEFDJGHGKKVBNJPVJWOJFYNUIG")
-          {
-            $('#maintable').append(
-              $('<tr class="a">').html('<td>' + showtx(tx.hash,0) + '</td>')
-            );
-          }
-        });
-      });
-
-      $('#maintable').append(
-        $('<tr class="a">').html('<td>done</td>')
-      );
-
-      return false;
-    });
-
-    $(".prev").click( function(e){
-      e.preventDefault();
-
-      $('#maintable').html("");
-      toShow -= numRows;
-      if(toShow<0)
-        toShow = 0;
-      showind = toShow;
-
-      return false;
-    });
-
-    $(".next").click( function(e){
-      e.preventDefault();
-
-      $('#maintable').html("");
-      toShow += numRows;
-      if(toShow > bundles.length)
-        toShow = bundles.length - numRows;
-      showind = toShow;
-
-      return false;
+       $('#status').html("Time: " + d + " nTips: " + data.hashes.length + " Getting second set of tips... Please wait!");
     });
 
     $(document).on("click", ".leg", function(e){
@@ -157,8 +93,16 @@ $(document).ready(function(){
         }
 
         $.each(data.transactions, function(i, item) {
-           getTrytes.hashes.push(item.hash);
+          getTrytes.hashes.push(item.hash);
         });
+
+        var wrongbundle = "";
+
+        if(getTrytes.hashes.length == 0) {
+          console.log("Wrong bundle: " + tail);
+          var wrongbundle = "WRONG!!!!: ";
+          getTrytes.hashes.push(tail);
+        }
 
         sendRequest(getTrytes, function(trytes) {
            console.log("Got trytes: " + JSON.stringify(trytes));
@@ -173,7 +117,13 @@ $(document).ready(function(){
 
              var item = analyze.transactions[analyze.transactions.length - 1];
 
-             var newhtml = '<table><tr><td colspan="2">' + showtx(tail, 10) + '</td></tr><tr><td>' + showleg(item.approvedTrunkTransaction, 10) + '</td><td>' + showleg(item.approvedBranchTransaction, 10) + '</td></tr></table>';
+             var newhtml = '<table><tr><td colspan="2">' + wrongbundle + showtx(tail, 10) + '<br/>';
+             var i;
+             for(i = 1; i < analyze.transactions.length; i++) {
+               console.log("More txs in one bundle: " + tail);
+               newhtml = newhtml + showtx(analyze.transactions[i].hash, 10) + '<br/>';
+             }
+             newhtml = newhtml + '</td></tr><tr><td>' + showleg(item.approvedTrunkTransaction, 10) + '</td><td>' + showleg(item.approvedBranchTransaction, 10) + '</td></tr></table>';
              console.log("newhtml: " + newhtml);
              obj.parent().html(newhtml);
            });
@@ -223,79 +173,8 @@ $(document).ready(function(){
       return result + '</a>';
     };
 
-    setInterval(function(){
-      if(work.length > 0) {
-
-        var tail = work.shift();
-
-        var knownTx = transactions.has(tail);
-        if(!knownTx) {
-          var getBundle = {
-            'command': 'getBundle',
-            'transaction': tail
-          }
-
-          sendRequest(getBundle, function(data) {
-            console.log("Got bundle: " + JSON.stringify(data));
-
-             var getTrytes = {
-               'command': 'getTrytes',
-               'hashes': []
-             }
-
-             $.each(data.transactions, function(i, item) {
-               var knownTx = transactions.has(item.hash);
-               if(!knownTx)
-                getTrytes.hashes.push(item.hash);
-               else
-                console.log("known tx... not for analyze: " + item.hash);
-             });
-
-             if(getTrytes.hashes.length > 0) {
-               bundles.set(getBundle.tail, { 'hashes': getTrytes.hashes });
-             } else {
-               getTrytes.hashes.push(tail);
-             }
-
-             sendRequest(getTrytes, function(trytes) {
-                console.log("Got trytes: " + JSON.stringify(trytes));
-
-                var analyzeTransactions = {
-                  'command': 'analyzeTransactions',
-                  'trytes': trytes.trytes
-                }
-
-                sendRequest(analyzeTransactions, function(analyze) {
-                  console.log("Analyze trytes: " + JSON.stringify(analyze));
-
-                  $.each(analyze.transactions, function(i, item) {
-                    transactions.set(item.hash, item);
-                    work.push(item.approvedTrunkTransaction);
-                    work.push(item.approvedBranchTransaction);
-                    worksTotal+=2;
-                  });
-
-                  console.log("unknownn bundle registered....");
-                  $('.progress-bar').attr('aria-valuemax', worksTotal);
-                  $('.progress-bar').attr('aria-valuenow', ++worksDid);
-                  var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
-                  $('.progress-bar').css('width', siz+'%');
-                });
-             });
-          });
-        } else {
-          console.log("known tail... dropped: " + tail);
-          $('.progress-bar').attr('aria-valuenow', ++worksDid);
-          var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
-          $('.progress-bar').css('width', siz+'%');
-        }
-      }
-      else if (worksDid == worksTotal) {
-        $('.progress-bar').attr('aria-valuenow', worksDid);
-        $('.progress-bar').css('width', '100%');
-        console.log("set 100%");
-      }
-    }, 1000);
+    var oldtips = [];
+    var tips = [];
 
     var newTips = [];
     var xTips = [];
@@ -327,20 +206,49 @@ $(document).ready(function(){
     setInterval( function() {
       if(iTips == tips.length && iOldTips == oldtips.length) {
         var d = new Date();
-        $('#status').append("Time: " + d + " worksTotal: " + worksTotal + " worksDid: " + worksDid + " xTips: " + xTips.length + " newTips: " + newTips.length + " nTips: " + tips.length + "<br/>");
 
-        var tmp = [];
-        tmp = xTips.concat(newTips);
-        work = work.concat(tmp);
-        worksTotal += tmp.length;
-        $('.progress-bar').attr('aria-valuemax', worksTotal);
+        var row = '<table><tr><td colspan="2">' + "Time: " + d + " nTips: " + tips.length + "</td></tr>";
+        row = row + "<tr><td>" + "xTips: " + xTips.length + "</td><td>";
+
+        if(xTips.length > 0) {
+          row = row + "<table><tr>";
+
+          $.each( xTips, function(i, tip){
+            row = row + "<td>" + showleg(tip, 10) + "</td>";
+          });
+
+          row = row + "</tr></table>";
+        }
+
+        row = row + "</td></tr>";
+
+        row = row + "<tr><td>" + "newTips: " + newTips.length + "</td><td>";
+
+        if(newTips.length > 0) {
+          row = row + "<table><tr>";
+
+          $.each( newTips, function(i, tip){
+            row = row + "<td>" + showleg(tip, 10) + "</td>";
+          });
+
+          row = row + "</tr></table>";
+        }
+
+        row = row + "</td></tr></table>";
+
+        $('#maintable').html( row + "<br/>" + $('#maintable').html());
 
         xTips = [];
         newTips = [];
+
+        var d = new Date();
+        $('#status').html("Time: " + d + " nTips: " + tips.length + " Getting tips...");
       }
 
       sendRequest(getTips, function(data) {
          console.log("Got tx: " + JSON.stringify(data));
+         var d = new Date();
+         $('#status').html("Time: " + d + " nTips: " + data.hashes.length + " Comparing it... Please wait!");
 
          run = false;
          oldtips = tips;
@@ -360,63 +268,34 @@ $(document).ready(function(){
     <div class="navbar-header">
       <a class="navbar-brand" href="#">tangleTools</a>
     </div>
-    <ul class="nav navbar-nav">
-      <li><a href="#" id="play"><span class="glyphicon glyphicon-play"></span></a></li>
-    </ul>
-    <ul class="nav navbar-nav navbar-right">
-      <li class="dropdown">
-      	<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><span class="glyphicon glyphicon-cog"></span></a>
-      	<ul class="dropdown-menu">
-      	  <li><a href="#settings" data-toggle="modal">Settings...</a></li>
-      	</ul>
-      </li>
-    </ul>
   </div>
 </nav>
 
 <div class="container-fluid" style="background-color:white;">
-  <div class="progress">
-    <div class="progress-bar" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="1" role="progressbar" style="width:0.1%">
-    </div>
-  </div>
-</div>
-
-<div class="container-fluid" style="background-color:white;">
-  <ul class="pager">
-   <li><a href="#" class="prev">Previous</a></li>
-   <li><span id="pointer"></span></li>
-   <li><a href="#" class="next">Next</a></li>
-  </ul>
-</div>
-
-<div class="container-fluid" style="background-color:white;">
-  <div class="col-sm-3" style="background-color:white;">
-  </div>
-  <div class="col-sm-6" style="background-color:white;">
+  <div class="col-sm-12" style="background-color:white;">
     <p id="status"></p>
   </div>
-  <div class="col-sm-6" style="background-color:white;">
-  </div>
 </div>
-
 <!-- Content -->
 <div class="container-fluid" style="background-color:white;">
   <div class="row">
     <div class="col-sm-12" style="background-color:#bbbbbb;">
       <table id="maintable" class="tangle">
-        <tr><td><a href="#" class="leg" id="BIIVICUISRJOFEDIUDRNXFZIYERDWYGUWZKMRISNVPWQPW9UIJKAABENKERVAAH9EHJZDMNTSFRFW9999">BIIVICUISR...</a></td></tr>
       </table>
     </div>
   </div>
 
-     <!-- Footer -->
+  <!-- Footer -->
   <div class="row">
-    <div class="col-sm-5" style="background-color:white;">
+    <div class="col-sm-3" style="background-color:white;">
     </div>
-    <div class="col-sm-2" style="background-color:white;">
-       <p>Programmed by ifinta. See my <a href="http://github.com/ifinta">github</a> repositories also.</p>
+    <div class="col-sm-6" style="background-color:white;">
+       <p>Programmed by ifinta. See my <a href="http://github.com/ifinta" target="_blank">github</a> repositories also.</p>
+       <h3>Donations:</h3>
+       <p>IOTA: LGQQTNJFXAZRAOWVEAZQ9EMRVVPPFYQKKONUVTLFXAJQ9HJU9AHMSXLQYQEEXBLNIBLRAQTKGUEMSRTENKZDFQJZQH</p>
+       <p>BTC: 1FiNTaXmmHDasJUhgkSo5U79uuQN7c5pB5</p>
     </div>
-    <div class="col-sm-5" style="background-color:white;">
+    <div class="col-sm-3" style="background-color:white;">
     </div>
   </div>
 </div>
@@ -440,27 +319,6 @@ $(document).ready(function(){
       </div>
       <div class="modal-footer">
 	       <button type="button" class="btn btn-default" data-dismiss="modal" id="savebutton">Ok</button>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- Modal settings...-->
-<div class="modal fade" role="dialog" id="settings">
-  <div class="modal-dialog">
-    <!-- Modal content-->
-    <div class="modal-content">
-      <div class="modal-header">
-      	<button type="button" class="close" data-dismiss="modal">&times;</button>
-      	<h4 class="modal-title">Settings</h4>
-      </div>
-      <div class="modal-body">
-      	<form role="form">
-      	</form>
-      </div>
-      <div class="modal-footer">
-	       <button type="button" class="btn btn-default" data-dismiss="modal" id="setbutton">Set</button>
       </div>
     </div>
 
