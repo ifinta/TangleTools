@@ -39,6 +39,15 @@
 
 <script>
 
+var pleaseWait = " Please wait!";
+
+var work = [];
+var bundles = new Map();
+var transactions = new Map();
+
+var worksDid = 0;
+var worksTotal = 0;
+
 function sendRequest(requestData, callback) {
   var url = "http://127.0.0.1:14265";
   console.log( "Sending an request to " + url + " with data " + JSON.stringify(requestData) );
@@ -60,18 +69,23 @@ function sendRequest(requestData, callback) {
 }
 
 $(document).ready(function(){
+    $('.progress-bar').attr('aria-valuemin', 0);
+    $('.progress-bar').attr('aria-valuemax', 1000);
+    $('.progress-bar').attr('aria-valuenow', 0);
+    $('.progress-bar').css('width', '0.1%');
+
     var getTips = {
         'command': 'getTips'
     }
 
     var d = new Date();
-    $('#status').html("Time: " + d + " Getting tips... Please wait!");
+    $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Getting tips..." + pleaseWait);
 
     sendRequest(getTips, function(data) {
        console.log("Got tx: " + JSON.stringify(data));
        tips = data.hashes;
        var d = new Date();
-       $('#status').html("Time: " + d + " nTips: " + data.hashes.length + " Getting second set of tips... Please wait!");
+       $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.hashes.length + " Getting second set of tips..." + pleaseWait);
     });
 
     $(document).on("click", ".leg", function(e){
@@ -173,6 +187,91 @@ $(document).ready(function(){
       return result + '</a>';
     };
 
+    setInterval(function(){
+      if(work.length > 0) {
+
+        var tail = work.shift();
+
+        var knownTx = transactions.has(tail);
+        if(!knownTx) {
+          var getBundle = {
+            'command': 'getBundle',
+            'transaction': tail
+          }
+
+          sendRequest(getBundle, function(data) {
+            console.log("Got bundle: " + JSON.stringify(data));
+
+             var getTrytes = {
+               'command': 'getTrytes',
+               'hashes': []
+             }
+
+             $.each(data.transactions, function(i, item) {
+               var knownTx = transactions.has(item.hash);
+               if(!knownTx)
+                getTrytes.hashes.push(item.hash);
+               else
+                console.log("known tx... not for analyze: " + item.hash);
+             });
+
+             if(getTrytes.hashes.length > 0) {
+               bundles.set(getBundle.tail, { 'hashes': getTrytes.hashes });
+             } else {
+               getTrytes.hashes.push(tail);
+             }
+
+             sendRequest(getTrytes, function(trytes) {
+                console.log("Got trytes: " + JSON.stringify(trytes));
+
+                var analyzeTransactions = {
+                  'command': 'analyzeTransactions',
+                  'trytes': trytes.trytes
+                }
+
+                sendRequest(analyzeTransactions, function(analyze) {
+                  console.log("Analyze trytes: " + JSON.stringify(analyze));
+
+                  $.each(analyze.transactions, function(i, item) {
+                    transactions.set(item.hash, item);
+                    work.push(item.approvedTrunkTransaction);
+                    work.push(item.approvedBranchTransaction);
+                    worksTotal+=2;
+                  });
+
+                  console.log("unknownn bundle registered....");
+                  worksDid++;
+                  if(pleaseWait ==""  && worksDid != 0) {
+                    $('.progress-bar').attr('aria-valuemax', worksTotal);
+                    $('.progress-bar').attr('aria-valuenow', worksDid);
+                    var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
+                    $('.progress-bar').css('width', siz+'%');
+                  }
+                });
+             });
+          });
+        } else {
+          console.log("known tail... dropped: " + tail);
+          worksDid++;
+          if(pleaseWait ==""  && worksDid != 0) {
+            $('.progress-bar').attr('aria-valuenow', worksDid);
+            var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
+            $('.progress-bar').css('width', siz+'%');
+          }
+        }
+      }
+      else if (worksDid == worksTotal) {
+        if(pleaseWait ==""  && worksDid != 0) {
+          $('.progress-bar').attr('aria-valuenow', worksDid);
+          $('.progress-bar').css('width', '100%');
+          console.log("set 100%");
+        }
+      }
+
+      if(pleaseWait == "")
+        $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Exploring the Tangle...");
+    }, 1000);
+
     var oldtips = [];
     var tips = [];
 
@@ -207,8 +306,8 @@ $(document).ready(function(){
       if(iTips == tips.length && iOldTips == oldtips.length) {
         var d = new Date();
 
-        var row = '<table><tr><td colspan="2">' + "Time: " + d + " nTips: " + tips.length + "</td></tr>";
-        row = row + "<tr><td>" + "xTips: " + xTips.length + "</td><td>";
+        var row = '<table><tr><td colspan="2">' + "Time: " + d + " Number of tips: " + tips.length + "</td></tr>";
+        row = row + "<tr><td>" + "Removed tips: " + xTips.length + "</td><td>";
 
         if(xTips.length > 0) {
           row = row + "<table><tr>";
@@ -222,7 +321,7 @@ $(document).ready(function(){
 
         row = row + "</td></tr>";
 
-        row = row + "<tr><td>" + "newTips: " + newTips.length + "</td><td>";
+        row = row + "<tr><td>" + "New tips: " + newTips.length + "</td><td>";
 
         if(newTips.length > 0) {
           row = row + "<table><tr>";
@@ -238,17 +337,25 @@ $(document).ready(function(){
 
         $('#maintable').html( row + "<br/>" + $('#maintable').html());
 
+        var tmp = [];
+        tmp = xTips.concat(newTips);
+        work = work.concat(tmp);
+        worksTotal += tmp.length;
+        if(pleaseWait =="" && worksDid != 0)
+          $('.progress-bar').attr('aria-valuemax', worksTotal);
+
         xTips = [];
         newTips = [];
 
         var d = new Date();
-        $('#status').html("Time: " + d + " nTips: " + tips.length + " Getting tips...");
+        $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Getting tips...");
+        pleaseWait = "";
       }
 
       sendRequest(getTips, function(data) {
          console.log("Got tx: " + JSON.stringify(data));
          var d = new Date();
-         $('#status').html("Time: " + d + " nTips: " + data.hashes.length + " Comparing it... Please wait!");
+         $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.hashes.length + " Start comparing..." + pleaseWait);
 
          run = false;
          oldtips = tips;
@@ -268,8 +375,42 @@ $(document).ready(function(){
     <div class="navbar-header">
       <a class="navbar-brand" href="#">tangleTools</a>
     </div>
+    <ul class="nav navbar-nav">
+      <li class="dropdown">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Actions
+        <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          <li><a href="#todo" data-toggle="modal">Clear log</a></li>
+        </ul>
+      </li>
+      <li class="dropdown">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Analyze
+        <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          <li><a href="#todo" data-toggle="modal">Bundle or Tx...</a></li>
+          <li><a href="#todo" data-toggle="modal">Tips...</a></li>
+          <li><a href="#todo" data-toggle="modal">Known Tangle...</a></li>
+        </ul>
+      </li>
+    </ul>
+    <ul class="nav navbar-nav navbar-right">
+      <li class="dropdown">
+      	<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><span class="glyphicon glyphicon-cog"></span></a>
+      	<ul class="dropdown-menu">
+      	  <li><a href="#settings" data-toggle="modal">Settings...</a></li>
+      	</ul>
+      </li>
+    </ul>
   </div>
 </nav>
+
+<div class="container-fluid" style="background-color:white;">
+  <h3>Exploring the Tangle...</h3>
+  <div class="progress">
+    <div class="progress-bar" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="1" role="progressbar" style="width:0.1%">
+    </div>
+  </div>
+</div>
 
 <div class="container-fluid" style="background-color:white;">
   <div class="col-sm-12" style="background-color:white;">
@@ -290,7 +431,7 @@ $(document).ready(function(){
     <div class="col-sm-3" style="background-color:white;">
     </div>
     <div class="col-sm-6" style="background-color:white;">
-       <p>Programmed by ifinta. See my <a href="http://github.com/ifinta" target="_blank">github</a> repositories also.</p>
+       <p>Idee, design and programming by ifinta. Copyright 2016 by ifinta. The source of the page published under GPL licence. See my <a href="http://github.com/ifinta/tangleTools" target="_blank">github</a> repository.</p>
        <h3>Donations:</h3>
        <p>IOTA: LGQQTNJFXAZRAOWVEAZQ9EMRVVPPFYQKKONUVTLFXAJQ9HJU9AHMSXLQYQEEXBLNIBLRAQTKGUEMSRTENKZDFQJZQH</p>
        <p>BTC: 1FiNTaXmmHDasJUhgkSo5U79uuQN7c5pB5</p>
@@ -321,7 +462,48 @@ $(document).ready(function(){
 	       <button type="button" class="btn btn-default" data-dismiss="modal" id="savebutton">Ok</button>
       </div>
     </div>
+  </div>
+</div>
 
+<!-- Modal: settings...-->
+<div class="modal fade" role="dialog" id="settings">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+      	<button type="button" class="close" data-dismiss="modal">&times;</button>
+      	<h4 class="modal-title">Settings</h4>
+      </div>
+      <div class="modal-body">
+        <form role="form">
+          <div class="checkbox">
+            <label><input type="checkbox">Don't add spams to log</label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+	       <button type="button" class="btn btn-default" data-dismiss="modal" id="setbutton">Set</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: not yet implemented...-->
+<div class="modal fade" role="dialog" id="todo">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+      	<button type="button" class="close" data-dismiss="modal">&times;</button>
+      	<h4 class="modal-title">Info</h4>
+      </div>
+      <div class="modal-body">
+        <p>Sorry. This feature does not yet implemented...</p>
+      </div>
+      <div class="modal-footer">
+	       <button type="button" class="btn btn-default" data-dismiss="modal">Ok</button>
+      </div>
+    </div>
   </div>
 </div>
 
