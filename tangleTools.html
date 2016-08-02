@@ -27,9 +27,19 @@
     width: 1000px;
   }
 
+  #txapproval .modal-dialog
+  {
+    width: 800px;
+  }
+
   table, td
   {
     border: 1px solid black;
+  }
+
+  .modal-backdrop
+  {
+    opacity:0.6 !important;
   }
   </style>
 
@@ -40,6 +50,8 @@
 <script>
 
 var pleaseWait = " Please wait!";
+var started = false;
+var pause = false;
 
 var work = [];
 var bundles = new Map();
@@ -69,23 +81,52 @@ function sendRequest(requestData, callback) {
 }
 
 $(document).ready(function(){
-    $('.progress-bar').attr('aria-valuemin', 0);
-    $('.progress-bar').attr('aria-valuemax', 1000);
-    $('.progress-bar').attr('aria-valuenow', 0);
-    $('.progress-bar').css('width', '0.1%');
+    $("#pause").hide();
+    $("#startexplore").show();
+
+    $("#pause").click( function(e){
+      $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " PAUSE");
+      e.preventDefault();
+      $("#pause").hide();
+      $("#startexplore").show();
+      pause = true;
+      return false;
+    });
+
+    $(document).on("click", "#trytoapprove", function(e){
+    });
+
+    $(document).on("click", "#clearall", function(e){
+      $('#maintable').html("");
+    });
 
     var getTips = {
         'command': 'getTips'
     }
 
-    var d = new Date();
-    $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Getting tips..." + pleaseWait);
+    $(document).on("click", "#startexplore", function(e){
+      $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length);
+      $("#pause").show();
+      $("#startexplore").hide();
+      pause = false;
+      if(!started) {
+        started = true;
+        $('.progress-bar').attr('aria-valuemin', 0);
+        $('.progress-bar').attr('aria-valuemax', 1000);
+        $('.progress-bar').attr('aria-valuenow', 0);
+        $('.progress-bar').css('width', '0.1%');
+        $('#progressbar').toggle();
 
-    sendRequest(getTips, function(data) {
-       console.log("Got tx: " + JSON.stringify(data));
-       tips = data.hashes;
-       var d = new Date();
-       $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.hashes.length + " Getting second set of tips..." + pleaseWait);
+        var d = new Date();
+        $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Getting tips..." + pleaseWait);
+
+        sendRequest(getTips, function(data) {
+           console.log("Got tx: " + JSON.stringify(data));
+           tips = data.hashes;
+           var d = new Date();
+           $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.hashes.length + " Getting second set of tips..." + pleaseWait);
+        });
+      }
     });
 
     $(document).on("click", ".leg", function(e){
@@ -188,7 +229,7 @@ $(document).ready(function(){
     };
 
     setInterval(function(){
-      if(work.length > 0) {
+      if(!pause && work.length > 0) {
 
         var tail = work.shift();
 
@@ -260,7 +301,7 @@ $(document).ready(function(){
           }
         }
       }
-      else if (worksDid == worksTotal) {
+      else if (!pause && worksDid == worksTotal) {
         if(pleaseWait ==""  && worksDid != 0) {
           $('.progress-bar').attr('aria-valuenow', worksDid);
           $('.progress-bar').css('width', '100%');
@@ -268,7 +309,7 @@ $(document).ready(function(){
         }
       }
 
-      if(pleaseWait == "")
+      if(!pause && pleaseWait == "")
         $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Exploring the Tangle...");
     }, 1000);
 
@@ -303,7 +344,7 @@ $(document).ready(function(){
     }, 2000);
 
     setInterval( function() {
-      if(iTips == tips.length && iOldTips == oldtips.length) {
+      if(!pause && iTips == tips.length && iOldTips == oldtips.length) {
         var d = new Date();
 
         var row = '<table><tr><td colspan="2">' + "Time: " + d + " Number of tips: " + tips.length + "</td></tr>";
@@ -352,18 +393,20 @@ $(document).ready(function(){
         pleaseWait = "";
       }
 
-      sendRequest(getTips, function(data) {
-         console.log("Got tx: " + JSON.stringify(data));
-         var d = new Date();
-         $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.hashes.length + " Start comparing..." + pleaseWait);
+      if(started && !pause){
+        sendRequest(getTips, function(data) {
+           console.log("Got tx: " + JSON.stringify(data));
+           var d = new Date();
+           $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.hashes.length + " Start comparing..." + pleaseWait);
 
-         run = false;
-         oldtips = tips;
-         tips = data.hashes;
-         iOldTips = 0;
-         iTips = 0;
-         run = true;
-      });
+           run = false;
+           oldtips = tips;
+           tips = data.hashes;
+           iOldTips = 0;
+           iTips = 0;
+           run = true;
+        });
+      }
     }, 150000);
 });
 
@@ -376,11 +419,14 @@ $(document).ready(function(){
       <a class="navbar-brand" href="#">tangleTools</a>
     </div>
     <ul class="nav navbar-nav">
+      <li><a href="#" id="startexplore"><span class="glyphicon glyphicon-play"></span></a></li>
+      <li><a href="#" id="pause"><span class="glyphicon glyphicon-pause"></span></a></li>
       <li class="dropdown">
         <a class="dropdown-toggle" data-toggle="dropdown" href="#">Actions
         <span class="caret"></span></a>
         <ul class="dropdown-menu">
-          <li><a href="#todo" data-toggle="modal">Clear log</a></li>
+          <li><a href="#" id="clearall">Clear log</a></li>
+          <li><a href="#txapproval" data-toggle="modal">Try to approve transfers</a></li>
         </ul>
       </li>
       <li class="dropdown">
@@ -404,7 +450,7 @@ $(document).ready(function(){
   </div>
 </nav>
 
-<div class="container-fluid" style="background-color:white;">
+<div class="container-fluid" style="background-color:white;display:none" id="progressbar">
   <h3>Exploring the Tangle...</h3>
   <div class="progress">
     <div class="progress-bar" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="1" role="progressbar" style="width:0.1%">
@@ -432,6 +478,8 @@ $(document).ready(function(){
     </div>
     <div class="col-sm-6" style="background-color:white;">
        <p>Idee, design and programming by ifinta. Copyright 2016 by ifinta. The source of the page published under GPL licence. See my <a href="http://github.com/ifinta/tangleTools" target="_blank">github</a> repository.</p>
+       <p>Remarks:</p>
+       <p>- the idee for the feature "Try to approve transfers" coming from Jimmy Xiong</p>
        <h3>Donations:</h3>
        <p>IOTA: LGQQTNJFXAZRAOWVEAZQ9EMRVVPPFYQKKONUVTLFXAJQ9HJU9AHMSXLQYQEEXBLNIBLRAQTKGUEMSRTENKZDFQJZQH</p>
        <p>BTC: 1FiNTaXmmHDasJUhgkSo5U79uuQN7c5pB5</p>
@@ -483,6 +531,38 @@ $(document).ready(function(){
       </div>
       <div class="modal-footer">
 	       <button type="button" class="btn btn-default" data-dismiss="modal" id="setbutton">Set</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Try to approve a transfer...-->
+<div class="modal fade" role="dialog" id="txapproval">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+      	<button type="button" class="close" data-dismiss="modal">&times;</button>
+      	<h4 class="modal-title">Try to approve transfers</h4>
+      </div>
+      <div class="modal-body">
+        <form class="form-horizontal" role="form">
+          <div class="form-group">
+            <label class="control-label col-sm-2" for="transfera">Tx id A:</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="transfera" placeholder="Enter your transfer hash">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="control-label col-sm-2" for="transferb">Tx id B:</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="transferb" placeholder="Enter your transfer hash">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+	       <button type="button" class="btn btn-default" data-dismiss="modal" id="trytoapprove">Try to approve</button>
       </div>
     </div>
   </div>
