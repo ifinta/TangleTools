@@ -105,16 +105,25 @@ $(document).ready(function(){
       sendRequest(attachToTangle, function(data) {
          console.log("Got result: " + JSON.stringify(data));
 
-         var broadcastTransactions = {
-           'command': 'broadcastTransactions',
+         var storeTransactions = {
+           'command': 'storeTransactions',
            'trytes': data.trytes
          }
 
-         sendRequest(broadcastTransactions, function(res) {
-            console.log("Got result: " + JSON.stringify(res));
+         sendRequest(storeTransactions, function(res1) {
+            console.log("Got result: " + JSON.stringify(res1));
 
-            var row = "<table><tr><td>Result:</td><td> " + JSON.stringify(res) + "</td></tr></table>";
-            $('#maintable').html( row + "<br/>" + $('#maintable').html());
+            var broadcastTransactions = {
+              'command': 'broadcastTransactions',
+              'trytes': data.trytes
+            }
+
+            sendRequest(broadcastTransactions, function(res) {
+               console.log("Got result: " + JSON.stringify(res));
+
+               var row = "<table><tr><td>Result of broadcast:</td><td> " + JSON.stringify(res) + "</td></tr></table>";
+               $('#maintable').html( row + "<br/>" + $('#maintable').html());
+            });
          });
       });
     });
@@ -216,21 +225,34 @@ $(document).ready(function(){
         'hashes': []
       }
 
-      getTrytes.hashes.push(this.id);
+      var approvers = [];
+      var knownTx = transactions.has(this.id);
+      if(knownTx) {
+        knownTx = transactions.get(this.id)['discovered'];
+        approvers = transactions.get(this.id)['approvers'];
+      }
+      if(!knownTx) {
+        getTrytes.hashes.push(this.id);
 
-      sendRequest(getTrytes, function(trytes) {
-         console.log("Got tx trytes: " + JSON.stringify(trytes));
+        sendRequest(getTrytes, function(trytes) {
+           console.log("Got tx trytes: " + JSON.stringify(trytes));
 
-         var analyzeTransactions = {
-           'command': 'analyzeTransactions',
-           'trytes': trytes.trytes
-         }
+           var analyzeTransactions = {
+             'command': 'analyzeTransactions',
+             'trytes': trytes.trytes
+           }
 
-         sendRequest(analyzeTransactions, function(analyze) {
-           console.log("Analyze tx trytes: " + JSON.stringify(analyze));
-           $("#showtxcontent").text(JSON.stringify(analyze.transactions[0]));
-         });
-      });
+           sendRequest(analyzeTransactions, function(analyze) {
+             console.log("Analyze tx trytes: " + JSON.stringify(analyze));
+
+             if(approvers.length > 0)
+              analyze.transactions[0]['approvers'] = approvers;
+             $("#showtxcontent").text(JSON.stringify(analyze.transactions[0]));
+           });
+        });
+      } else {
+        $("#showtxcontent").text(JSON.stringify(transactions.get(this.id)));
+      }
     });
 
     function showleg(hash, n) {
@@ -257,6 +279,10 @@ $(document).ready(function(){
         var tail = work.shift();
 
         var knownTx = transactions.has(tail);
+        if(knownTx) {
+            knownTx = transactions.get(tail)['discovered'];
+        }
+
         if(!knownTx) {
           var getBundle = {
             'command': 'getBundle',
@@ -297,9 +323,34 @@ $(document).ready(function(){
                   console.log("Analyze trytes: " + JSON.stringify(analyze));
 
                   $.each(analyze.transactions, function(i, item) {
+                    item['discovered'] = true;
+                    if(!item['approvers'])
+                      item['approvers'] = [];
+                    if(transactions.has(item.hash)) {
+                      var approvers = transactions.get(item.hash)['approvers'];
+                      item['approvers'] = item['approvers'].concat(approvers);
+                    } else {
+                      item['approvers'] = [];
+                    }
+
                     transactions.set(item.hash, item);
+
                     work.push(item.approvedTrunkTransaction);
+                    if(transactions.has(item.approvedTrunkTransaction)) {
+                      var info = transactions.get(item.approvedTrunkTransaction);
+                      info['approvers'].push(item.hash);
+                    } else {
+                      transactions.set(item.approvedTrunkTransaction, {'discovered':false, 'approvers':[item.hash]});
+                    }
+
                     work.push(item.approvedBranchTransaction);
+                    if(transactions.has(item.approvedBranchTransaction)) {
+                      var info = transactions.get(item.approvedBranchTransaction);
+                      info['approvers'].push(item.hash);
+                    } else {
+                      transactions.set(item.approvedBranchTransaction, {'discovered':false, 'approvers':[item.hash]});
+                    }
+
                     worksTotal+=2;
                   });
 
@@ -334,7 +385,7 @@ $(document).ready(function(){
 
       if(!pause && pleaseWait == "")
         $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Exploring the Tangle...");
-    }, 1000);
+    }, 2000);
 
     var oldtips = [];
     var tips = [];
@@ -411,7 +462,6 @@ $(document).ready(function(){
         xTips = [];
         newTips = [];
 
-        var d = new Date();
         $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Getting tips...");
         pleaseWait = "";
       }
@@ -419,7 +469,6 @@ $(document).ready(function(){
       if(started && !pause){
         sendRequest(getTips, function(data) {
            console.log("Got tx: " + JSON.stringify(data));
-           var d = new Date();
            $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.hashes.length + " Start comparing..." + pleaseWait);
 
            run = false;
