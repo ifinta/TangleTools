@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
   <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+  <script src="iota.lib.js/dist/iota.min.js"></script>
 
   <style>
   th, td {
@@ -91,41 +92,6 @@ $(document).ready(function(){
       $("#startexplore").show();
       pause = true;
       return false;
-    });
-
-    $(document).on("click", "#trytoapprove", function(e){
-      var attachToTangle = {
-        'command': 'attachToTangle',
-        'trunkTransactionToApprove': $("#transfera").val(),
-        'branchTransactionToApprove': $("#transferb").val(),
-        'minWeightMagnitude': 13,
-        'trytes': ['999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999CFVFLUD99999999999SCOOZBVAWGXFZAOYDQFQAD9B9ET999999999999999999999999999WBOGXQGNQQDDQEVAFHVHVKZWFBSAKFPGTJSLWNPTVPBJSHBUBEUNCMGZWKPJ9LJOVBKJ9ZYGRUMGPDYETVAKYPEOFWLOVTCJIYXLBMLGSBRFQYGKSUM9SMLXRRLFKMLHBELHITURQBXDMHONVQTNOBFFVUEVHW99999UXHFCSVDPUBNZVYMUBYQEUZADGLTWIVCZPHFXNCGEJIDNXHJQDIZNOONWFEZVYAJXVGGWFTWZNVW9999'],
-      }
-
-      sendRequest(attachToTangle, function(data) {
-         console.log("Got result: " + JSON.stringify(data));
-
-         var storeTransactions = {
-           'command': 'storeTransactions',
-           'trytes': data.trytes
-         }
-
-         sendRequest(storeTransactions, function(res1) {
-            console.log("Got result: " + JSON.stringify(res1));
-
-            var broadcastTransactions = {
-              'command': 'broadcastTransactions',
-              'trytes': data.trytes
-            }
-
-            sendRequest(broadcastTransactions, function(res) {
-               console.log("Got result: " + JSON.stringify(res));
-
-               var row = "<table><tr><td>Result of broadcast:</td><td> " + JSON.stringify(res) + "</td></tr></table>";
-               $('#maintable').html( row + "<br/>" + $('#maintable').html());
-            });
-         });
-      });
     });
 
     $(document).on("click", "#clearall", function(e){
@@ -498,7 +464,6 @@ $(document).ready(function(){
         <span class="caret"></span></a>
         <ul class="dropdown-menu">
           <li><a href="#" id="clearall">Clear log</a></li>
-          <li><a href="#txapproval" data-toggle="modal">Try to approve transfers</a></li>
         </ul>
       </li>
       <li class="dropdown">
@@ -550,11 +515,8 @@ $(document).ready(function(){
     </div>
     <div class="col-sm-6" style="background-color:white;">
        <p>Idee, design and programming by ifinta. Copyright 2016 by ifinta. The source of the page published under GPL licence. See my <a href="http://github.com/ifinta/tangleTools" target="_blank">github</a> repository.</p>
-       <p>Remarks:</p>
-       <p>- the idee for the feature "Try to approve transfers" coming from Jimmy Xiong</p>
        <h3>Donations:</h3>
-       <p>IOTA: LGQQTNJFXAZRAOWVEAZQ9EMRVVPPFYQKKONUVTLFXAJQ9HJU9AHMSXLQYQEEXBLNIBLRAQTKGUEMSRTENKZDFQJZQH</p>
-       <p>BTC: 1FiNTaXmmHDasJUhgkSo5U79uuQN7c5pB5</p>
+       <p>IOTA: CVPVMVKEWVDRAHHDVJXNASUFTTBLKSCCAYUSRJTISXAK9OUJTTMITJWE9DHQNMWLOOFMGNTQLTKZRLNTQ</p>
     </div>
     <div class="col-sm-3" style="background-color:white;">
     </div>
@@ -603,38 +565,6 @@ $(document).ready(function(){
       </div>
       <div class="modal-footer">
 	       <button type="button" class="btn btn-default" data-dismiss="modal" id="setbutton">Set</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Try to approve a transfer...-->
-<div class="modal fade" role="dialog" id="txapproval">
-  <div class="modal-dialog">
-    <!-- Modal content-->
-    <div class="modal-content">
-      <div class="modal-header">
-      	<button type="button" class="close" data-dismiss="modal">&times;</button>
-      	<h4 class="modal-title">Try to approve transfers</h4>
-      </div>
-      <div class="modal-body">
-        <form class="form-horizontal" role="form">
-          <div class="form-group">
-            <label class="control-label col-sm-2" for="transfera">Tx id A:</label>
-            <div class="col-sm-10">
-              <input type="text" class="form-control" id="transfera" placeholder="Enter your transfer hash">
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="control-label col-sm-2" for="transferb">Tx id B:</label>
-            <div class="col-sm-10">
-              <input type="text" class="form-control" id="transferb" placeholder="Enter your transfer hash">
-            </div>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-	       <button type="button" class="btn btn-default" data-dismiss="modal" id="trytoapprove">Try to approve</button>
       </div>
     </div>
   </div>
