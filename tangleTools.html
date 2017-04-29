@@ -96,6 +96,7 @@ $(document).ready(function(){
           if (error) {
               console.error(error);
           } else {
+              console.log("Got tips... (" + result.length + ")");
               tips = result;
               var d = new Date();
               $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Getting second set of tips..." + pleaseWait);
@@ -166,7 +167,7 @@ $(document).ready(function(){
       if(n == 0)
         result = result + hash;
       else
-        result = result + hash.substring(0, n) + "...";
+        result = result + hash.toString().substr(0, n) + "...";
       return result + '</a>';
     };
 
@@ -175,7 +176,7 @@ $(document).ready(function(){
       if(n == 0)
         result = result + hash;
       else
-        result = result + hash.substring(0, n) + "...";
+        result = result + hash.toString().substr(0, n) + "...";
       return result + '</a>';
     };
 
@@ -275,7 +276,7 @@ $(document).ready(function(){
       var i;
       if(run) {
          console.log("Comparing..." + iAllTips);
-         for(i = 0; i<50000; i++) {
+         for(i = 0; i<25000; i++) {
            if(iAllTips+1 < alltips.length) {
              if(alltips[iAllTips].value == alltips[iAllTips+1].value) {
                iAllTips += 2;
@@ -331,15 +332,17 @@ $(document).ready(function(){
 
              $('#maintable').html( row + "<br/>" + $('#maintable').html());
 
+             console.log("Show xTips and newTips 2...");
              var tmp = [];
+             oldtips = [];
+             alltips = [];
              tmp = xTips.concat(newTips);
+             xTips = [];
+             newTips = [];
              work = work.concat(tmp);
              worksTotal += tmp.length;
              if(pleaseWait =="" && worksDid != 0)
                $('.progress-bar').attr('aria-valuemax', worksTotal);
-
-             xTips = [];
-             newTips = [];
 
              $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Getting tips...");
              pleaseWait = "";
@@ -347,7 +350,7 @@ $(document).ready(function(){
            }
          }
       }
-    }, 2000);
+    }, 3000);
 
     setInterval( function() {
       if(started && !pause){
@@ -355,7 +358,7 @@ $(document).ready(function(){
           if (error) {
               console.error(error);
           } else {
-              console.log("Got tips...");
+              console.log("Got tips... (" + data.length + ")");
               $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + data.length + " Start comparing..." + pleaseWait);
 
               run = false;
@@ -364,25 +367,26 @@ $(document).ready(function(){
               oldtips.forEach((x, i) => oldtips[i] = { value: x, type: 'old' } );
               tips.forEach((y, i) => tips[i] = { value: y, type: 'new' } );
               console.log("Added type...");
-              alltips = [];
               alltips = oldtips.concat(tips);
               console.log("Added tips and oldtips...");
-              alltips.sort(function(A, B) {
-                if(A.value < B.value) {
-                  return -1;
-                } else if(A.value == B.value) {
-                  return 0;
-                } else {
-                  return 1;
-                }
-              });
-              console.log("Sorted...");
+              if(alltips.length > 1) {
+                alltips.sort(function(A, B) {
+                  if(A.value < B.value) {
+                    return -1;
+                  } else if(A.value == B.value) {
+                    return 0;
+                  } else {
+                    return 1;
+                  }
+                });
+                console.log("Sorted...");
+              }
               iAllTips = 0;
               run = true;
           }
         });
       }
-    }, 120000);
+    }, 90000);
 });
 
 </script>
