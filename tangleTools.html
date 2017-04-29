@@ -114,42 +114,27 @@ $(document).ready(function(){
         if(error) {
           console.log(error);
         } else {
-          console.log("Got bundle: " + JSON.stringify(txs));
-
-          var hashes = [];
-
-          $.each(txs, function(i, item) {
-            hashes.push(item.hash);
-          });
+          console.log("LEG clicked...");
 
           var wrongbundle = "";
 
-          if(hashes.length == 0) {
+          if(txs.length == 0) {
             console.log("Wrong bundle: " + tail);
             var wrongbundle = "WRONG!!!!: ";
-            hashes.push(tail);
+          } else {
+            var item = txs[txs.length - 1];
           }
 
-          iota.api.getTransactionsObjects( hashes, function(error, objs) {
-             if(error) {
-               console.log(error);
-             } else {
-               console.log("Click on LEG...");
-
-               var item = objs[objs.length - 1];
-
-               var newhtml = '<table><tr><td colspan="2">' + wrongbundle + showtx(tail, 10) + '<br/>';
-               var i;
-               for(i = 1; i < objs.length; i++) {
-                  console.log("More txs in one bundle: " + tail);
-                  newhtml = newhtml + showtx(objs[i].hash, 10) + '<br/>';
-               }
-               newhtml = newhtml + '</td></tr><tr><td>' + showleg(item.trunkTransaction, 10) + '</td><td>' + showleg(item.branchTransaction, 10) + '</td></tr></table>';
-               console.log("newhtml: " + newhtml);
-               obj.parent().html(newhtml);
-             }
-           });
-         }
+          var newhtml = '<table><tr><td colspan="2">' + wrongbundle + showtx(tail, 10) + '<br/>';
+          var i;
+          for(i = 1; i < txs.length; i++) {
+             console.log("More txs in one bundle: " + tail);
+             newhtml = newhtml + showtx(txs[i].hash, 10) + '<br/>';
+          }
+          newhtml = newhtml + '</td></tr><tr><td>' + showleg(item.trunkTransaction, 10) + '</td><td>' + showleg(item.branchTransaction, 10) + '</td></tr></table>';
+          console.log("newhtml: " + newhtml);
+          obj.parent().html(newhtml);
+        }
        });
     });
 
