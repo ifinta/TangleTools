@@ -59,6 +59,16 @@ var iota = new IOTA({
     'provider': 'http://eugene.iota.community:14265'
 });
 
+var alltips = [];
+var oldtips = [];
+var tips = [];
+
+var newTips = [];
+var xTips = [];
+
+var iAllTips = 0;
+var run = false;
+
 $(document).ready(function(){
     $("#pause").hide();
     $("#startexplore").show();
@@ -98,6 +108,7 @@ $(document).ready(function(){
           } else {
               console.log("Got tips... (" + result.length + ")");
               tips = result;
+              tips.forEach((x, i) => tips[i] = { value: x, type: 'new' } );
               var d = new Date();
               $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Getting second set of tips..." + pleaseWait);
           }
@@ -261,17 +272,6 @@ $(document).ready(function(){
         $('#status').html("Known tasks: " + worksTotal + " Tasks did: " + worksDid + " Number of tips: " + tips.length + " Exploring the Tangle...");
     }, 2000);
 
-    var alltips = [];
-    var oldtips = [];
-    var tips = [];
-
-    var newTips = [];
-    var xTips = [];
-
-    var iAllTips = 0;
-
-    var run = false;
-
     setInterval( function() {
       var i;
       if(run) {
@@ -363,8 +363,8 @@ $(document).ready(function(){
 
               run = false;
               oldtips = tips;
+              oldtips.forEach((x, i) => oldtips[i] = { value: x.value, type: 'old' } );
               tips = data;
-              oldtips.forEach((x, i) => oldtips[i] = { value: x, type: 'old' } );
               tips.forEach((y, i) => tips[i] = { value: y, type: 'new' } );
               console.log("Added type...");
               alltips = oldtips.concat(tips);
