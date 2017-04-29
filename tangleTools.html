@@ -50,7 +50,6 @@ var started = false;
 var pause = false;
 
 var work = [];
-var bundles = new Map();
 var transactions = new Map();
 
 var worksDid = 0;
@@ -132,7 +131,6 @@ $(document).ready(function(){
              newhtml = newhtml + showtx(txs[i].hash, 10) + '<br/>';
           }
           newhtml = newhtml + '</td></tr><tr><td>' + showleg(item.trunkTransaction, 10) + '</td><td>' + showleg(item.branchTransaction, 10) + '</td></tr></table>';
-          console.log("newhtml: " + newhtml);
           obj.parent().html(newhtml);
         }
        });
@@ -140,7 +138,6 @@ $(document).ready(function(){
 
     $(document).on("click", ".tx", function () {
 
-      var hashes = [];
       var approvers = [];
       var knownTx = transactions.has(this.id);
       if(knownTx) {
@@ -148,9 +145,7 @@ $(document).ready(function(){
         approvers = transactions.get(this.id)['approvers'];
       }
       if(!knownTx) {
-        hashes.push(this.id);
-
-        iota.api.getTransactionsObjects( hashes, function(error, objs) {
+        iota.api.getBundle( this.id, function(error, objs) {
            if(error) {
              console.log(error);
            } else {
@@ -195,78 +190,52 @@ $(document).ready(function(){
         }
 
         if(!knownTx) {
-          iota.api.getBundle(tail, function(error, data) {
+          iota.api.getBundle(tail, function(error, objs) {
             if(error) {
               console.log(error);
             } else {
-               console.log("Got bundle: " + JSON.stringify(data));
+                console.log("Got bundle from work...");
 
-               var getTrytes = {
-                 'hashes': []
-               }
-
-               $.each(data.transactions, function(i, item) {
-                 var knownTx = transactions.has(item.hash);
-                 if(!knownTx)
-                  getTrytes.hashes.push(item.hash);
-                 else
-                  console.log("known tx... not for analyze: " + item.hash);
-               });
-
-               if(getTrytes.hashes.length > 0) {
-                 bundles.set(getBundle.tail, { 'hashes': getTrytes.hashes });
-               } else {
-                 getTrytes.hashes.push(tail);
-               }
-
-               iota.api.getTransactionsObjects( getTrytes.hashes, function(error, objs) {
-                  if(error) {
-                    console.log(error);
+                $.each(objs, function(i, item) {
+                  item['discovered'] = true;
+                  if(!item['approvers'])
+                    item['approvers'] = [];
+                  if(transactions.has(item.hash)) {
+                    var approvers = transactions.get(item.hash)['approvers'];
+                    item['approvers'] = item['approvers'].concat(approvers);
                   } else {
-                    console.log("Analyze trytes: " + JSON.stringify(objs));
-
-                    $.each(objs, function(i, item) {
-                      item['discovered'] = true;
-                      if(!item['approvers'])
-                        item['approvers'] = [];
-                      if(transactions.has(item.hash)) {
-                        var approvers = transactions.get(item.hash)['approvers'];
-                        item['approvers'] = item['approvers'].concat(approvers);
-                      } else {
-                        item['approvers'] = [];
-                      }
-
-                      transactions.set(item.hash, item);
-
-                      work.push(item.trunkTransaction);
-                      if(transactions.has(item.trunkTransaction)) {
-                        var info = transactions.get(item.trunkTransaction);
-                        info['approvers'].push(item.hash);
-                      } else {
-                        transactions.set(item.trunkTransaction, {'discovered':false, 'approvers':[item.hash]});
-                      }
-
-                      work.push(item.branchTransaction);
-                      if(transactions.has(item.branchTransaction)) {
-                        var info = transactions.get(item.branchTransaction);
-                        info['approvers'].push(item.hash);
-                      } else {
-                        transactions.set(item.branchTransaction, {'discovered':false, 'approvers':[item.hash]});
-                      }
-
-                      worksTotal+=2;
-                    });
-
-                    console.log("unknownn bundle registered....");
-                    worksDid++;
-                    if(pleaseWait ==""  && worksDid != 0) {
-                      $('.progress-bar').attr('aria-valuemax', worksTotal);
-                      $('.progress-bar').attr('aria-valuenow', worksDid);
-                      var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
-                      $('.progress-bar').css('width', siz+'%');
-                    }
+                    item['approvers'] = [];
                   }
-               });
+
+                  transactions.set(item.hash, item);
+
+                  work.push(item.trunkTransaction);
+                  if(transactions.has(item.trunkTransaction)) {
+                    var info = transactions.get(item.trunkTransaction);
+                    info['approvers'].push(item.hash);
+                  } else {
+                    transactions.set(item.trunkTransaction, {'discovered':false, 'approvers':[item.hash]});
+                  }
+
+                  work.push(item.branchTransaction);
+                  if(transactions.has(item.branchTransaction)) {
+                    var info = transactions.get(item.branchTransaction);
+                    info['approvers'].push(item.hash);
+                  } else {
+                    transactions.set(item.branchTransaction, {'discovered':false, 'approvers':[item.hash]});
+                  }
+
+                  worksTotal+=2;
+                });
+
+                console.log("unknownn bundle registered....");
+                worksDid++;
+                if(pleaseWait ==""  && worksDid != 0) {
+                  $('.progress-bar').attr('aria-valuemax', worksTotal);
+                  $('.progress-bar').attr('aria-valuenow', worksDid);
+                  var siz = (worksDid-$('.progress-bar').attr('aria-valuemin'))*100/($('.progress-bar').attr('aria-valuemax') - $('.progress-bar').attr('aria-valuemin'));
+                  $('.progress-bar').css('width', siz+'%');
+                }
             }
           });
         } else {
