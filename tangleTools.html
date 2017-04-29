@@ -110,33 +110,31 @@ $(document).ready(function(){
       var obj = $(this);
       console.log("id: " + tail);
 
-      iota.api.getBundle(tail, function(error, data) {
+      iota.api.getBundle(tail, function(error, txs) {
         if(error) {
           console.log(error);
         } else {
-          console.log("Got bundle: " + JSON.stringify(data));
+          console.log("Got bundle: " + JSON.stringify(txs));
 
-          var getTrytes = {
-            'hashes': []
-          }
+          var hashes = [];
 
-          $.each(data.transactions, function(i, item) {
-            getTrytes.hashes.push(item.hash);
+          $.each(txs, function(i, item) {
+            hashes.push(item.hash);
           });
 
           var wrongbundle = "";
 
-          if(getTrytes.hashes.length == 0) {
+          if(hashes.length == 0) {
             console.log("Wrong bundle: " + tail);
             var wrongbundle = "WRONG!!!!: ";
-            getTrytes.hashes.push(tail);
+            hashes.push(tail);
           }
 
-          iota.api.getTransactionsObjects( getTrytes.hashes, function(error, objs) {
+          iota.api.getTransactionsObjects( hashes, function(error, objs) {
              if(error) {
                console.log(error);
              } else {
-               console.log("Analyze trytes: " + JSON.stringify(objs));
+               console.log("Click on LEG...");
 
                var item = objs[objs.length - 1];
 
@@ -146,7 +144,7 @@ $(document).ready(function(){
                   console.log("More txs in one bundle: " + tail);
                   newhtml = newhtml + showtx(objs[i].hash, 10) + '<br/>';
                }
-               newhtml = newhtml + '</td></tr><tr><td>' + showleg(item.approvedTrunkTransaction, 10) + '</td><td>' + showleg(item.approvedBranchTransaction, 10) + '</td></tr></table>';
+               newhtml = newhtml + '</td></tr><tr><td>' + showleg(item.trunkTransaction, 10) + '</td><td>' + showleg(item.branchTransaction, 10) + '</td></tr></table>';
                console.log("newhtml: " + newhtml);
                obj.parent().html(newhtml);
              }
@@ -157,10 +155,7 @@ $(document).ready(function(){
 
     $(document).on("click", ".tx", function () {
 
-      var getTrytes = {
-        'hashes': []
-      }
-
+      var hashes = [];
       var approvers = [];
       var knownTx = transactions.has(this.id);
       if(knownTx) {
@@ -168,13 +163,13 @@ $(document).ready(function(){
         approvers = transactions.get(this.id)['approvers'];
       }
       if(!knownTx) {
-        getTrytes.hashes.push(this.id);
+        hashes.push(this.id);
 
-        iota.api.getTransactionsObjects( getTrytes.hashes, function(error, objs) {
+        iota.api.getTransactionsObjects( hashes, function(error, objs) {
            if(error) {
              console.log(error);
            } else {
-             console.log("Analyze trytes: " + JSON.stringify(objs));
+             console.log("Click on TX...");
 
              if(approvers.length > 0)
                 objs[0]['approvers'] = approvers;
@@ -258,20 +253,20 @@ $(document).ready(function(){
 
                       transactions.set(item.hash, item);
 
-                      work.push(item.approvedTrunkTransaction);
-                      if(transactions.has(item.approvedTrunkTransaction)) {
-                        var info = transactions.get(item.approvedTrunkTransaction);
+                      work.push(item.trunkTransaction);
+                      if(transactions.has(item.trunkTransaction)) {
+                        var info = transactions.get(item.trunkTransaction);
                         info['approvers'].push(item.hash);
                       } else {
-                        transactions.set(item.approvedTrunkTransaction, {'discovered':false, 'approvers':[item.hash]});
+                        transactions.set(item.trunkTransaction, {'discovered':false, 'approvers':[item.hash]});
                       }
 
-                      work.push(item.approvedBranchTransaction);
-                      if(transactions.has(item.approvedBranchTransaction)) {
-                        var info = transactions.get(item.approvedBranchTransaction);
+                      work.push(item.branchTransaction);
+                      if(transactions.has(item.branchTransaction)) {
+                        var info = transactions.get(item.branchTransaction);
                         info['approvers'].push(item.hash);
                       } else {
-                        transactions.set(item.approvedBranchTransaction, {'discovered':false, 'approvers':[item.hash]});
+                        transactions.set(item.branchTransaction, {'discovered':false, 'approvers':[item.hash]});
                       }
 
                       worksTotal+=2;
@@ -318,8 +313,6 @@ $(document).ready(function(){
     var newTips = [];
     var xTips = [];
 
-    var iOldTips = 0;
-    var iTips = 0;
     var iAllTips = 0;
 
     var run = false;
@@ -435,7 +428,7 @@ $(document).ready(function(){
           }
         });
       }
-    }, 60000);
+    }, 120000);
 });
 
 </script>
